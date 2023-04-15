@@ -60,14 +60,16 @@ async def handle_events(eventsQueue: asyncio.Queue):
     while True:
         event = await eventsQueue.get()
         eventsQueue.task_done()
-        # print("\nevent: ", event)
+        print("\nevent: ", event)
 
-        exch_time = datetime.fromtimestamp(event.ts_exchange / 1e9)
-        created_time = datetime.fromtimestamp(event.ts_recorded / 1e9)
-        print(f"\nreceived {event.__class__.__name__} event", event.symbol)
-        print(f"exchange time: {exch_time}")
-        print(f"  created time: {created_time}")
-        print(f"processed time: {datetime.now()}")
+        # exch_time = datetime.fromtimestamp(event.ts_exchange / 1e9)
+        # created_time = datetime.fromtimestamp(event.ts_recorded / 1e9)
+        # print(
+        # f"\nreceived {event.__class__.__name__} ({event.type}) event", event.symbol
+        # )
+        # print(f"exchange time: {exch_time}")
+        # print(f"  created time: {created_time}")
+        # print(f"processed time: {datetime.now()}")
 
         # if isinstance(event, OrderbookEvent):
         # print("_OB_", end="")

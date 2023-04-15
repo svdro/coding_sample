@@ -1,12 +1,22 @@
 import abc
+import aiohttp
 import json
 import time
 
 from enum import Enum
+from urllib.parse import urljoin
 from utils import SymbolsMeta
 from events import OrderbookEvent, OBEventType, Level, WsEventType
 from events import TradeEvent, Trade, TradeSide
 from typing import Any, Union
+
+
+async def get_request(url: str, params: dict[str, Any]) -> dict[str, Any]:
+    """makes a get request to the given url and params. return JSON"""
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, params=params) as resp:
+            resp.raise_for_status()
+            return await resp.json()
 
 
 class Exchange(abc.ABC):
@@ -15,11 +25,9 @@ class Exchange(abc.ABC):
     methods for interacting with Crypto Exchange APIs.
     """
 
-    @staticmethod
-    @abc.abstractmethod
-    def get_ws_url():
-        """returns the websocket url"""
-        raise NotImplementedError
+    _name: str
+    _ws_url: str
+    _symbolsMeta: SymbolsMeta
 
     @staticmethod
     @abc.abstractmethod
@@ -55,12 +63,9 @@ class Exchange(abc.ABC):
 class Binance(Exchange):
     _id = 0
     _name = "binance"
-    _url = "wss://stream.binance.com:9443/ws"
+    _ws_url = "wss://stream.binance.com:9443/ws"
+    _rest_url = "https://api.binance.com/"
     _symbolsMeta: SymbolsMeta = SymbolsMeta()
-
-    @staticmethod
-    def get_ws_url() -> str:
-        return Binance._url
 
     @staticmethod
     def prepare_book_subscription_msg(symbols: list[str]) -> str:
@@ -128,15 +133,38 @@ class Binance(Exchange):
             trades=[trade],
         )
 
+    @staticmethod
+    async def get_snapshot(symbol: str) -> dict[str, Any]:
+        """gets the order book snapshot from the rest api"""
+        url = urljoin(Binance._rest_url, "api/v3/depth")
+        params = {"symbol": symbol, "limit": 100}
+        return await get_request(url, params)
+
+    @staticmethod
+    async def get_orderbook_rest(symbol: str) -> OrderbookEvent:
+        """gets the order book snapshot from the rest api and returns an OrderbookEvent"""
+        t = time.time()
+        rest_symbol = Binance._symbolsMeta.sym2rest_sym(Binance._name, symbol)
+        data = await Binance.get_snapshot(rest_symbol)
+        bids = [Binance.parse_level(b) for b in data["bids"]]
+        asks = [Binance.parse_level(a) for a in data["asks"]]
+        update_ids = {"last_update_id": data["lastUpdateId"]}
+        return OrderbookEvent(
+            exch_name=Binance._name,
+            symbol=symbol,
+            type=OBEventType.SNAPSHOT,
+            bids=bids,
+            asks=asks,
+            ts_exchange=int((time.time() + t) / 2 * 1e9),  # fake ts_exchange
+            ts_recorded=int(time.time() * 1e9),
+            other=update_ids,
+        )
+
 
 class Kraken(Exchange):
     _name: str = "kraken"
-    _url: str = "wss://ws.kraken.com"
+    _ws_url: str = "wss://ws.kraken.com"
     _symbolsMeta: SymbolsMeta = SymbolsMeta()
-
-    @staticmethod
-    def get_ws_url() -> str:
-        return Kraken._url
 
     @staticmethod
     def prepare_book_subscription_msg(symbols: list[str]) -> str:

@@ -1,8 +1,17 @@
 import asyncio
 import json
 import websockets
-from exchanges import Exchange
+from exchanges import Exchange, Binance
 from events import WsEventType
+from typing import Callable
+
+
+async def queue_callback(
+    eventsQueue: asyncio.Queue, callback: Callable, *args, **kwargs
+):
+    """executes a callback and puts the result in the eventsQueue"""
+    result = await callback(*args, **kwargs)
+    eventsQueue.put_nowait(result)
 
 
 async def listen(
@@ -33,8 +42,7 @@ async def run_ws(
     eventsQueue: asyncio.Queue,
 ):
 
-    print("connecting to", exchange.get_ws_url())
-    async with websockets.connect(exchange.get_ws_url()) as websocket:
+    async with websockets.connect(exchange._ws_url) as websocket:
         if wsEventType == WsEventType.BOOK:
             subscription_msg = exchange.prepare_book_subscription_msg(symbols)
         elif wsEventType == WsEventType.TRADE:
@@ -42,6 +50,14 @@ async def run_ws(
         else:
             raise ValueError("wsEventType must be either BOOK or TRADE")
         await websocket.send(subscription_msg)
+
+        if isinstance(exchange, Binance):
+            # query binance rest api to get the orderbook snapshot
+            # and put it in the eventsQueue
+            for s in symbols:
+                asyncio.create_task(
+                    queue_callback(eventsQueue, exchange.get_orderbook_rest, s)
+                )
 
         # listen to incoming ws messages
         try:

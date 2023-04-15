@@ -11,6 +11,7 @@
  * [x] Connect to websocket apis
  * [x] Subscribe to orderbook and trades feeds
  * [ ] Maintain orderbooks
+ * [ ] Maintain trades (for snapshots)
  * [ ] Write orderbook and trades to repo (in this case probably csv)
    * collect data for kraken and coinbase
    * 1 second granularity

@@ -16,18 +16,8 @@ async def main():
 
     # create symbols list
     exch = Kraken()
-    # symbols = ["btceur"]
+    symbols = ["btceur"]
     # symbols = ["btceur", "etheur", "adaeur", "dogeeur"]
-    symbols = [
-        "btceur",
-        "etheur",
-        "adaeur",
-        "dogeeur",
-        "dogeusdt",
-        "dogeeur",
-        "dotusdt",
-        "doteur",
-    ]
 
     # create eventsQueue and events_task
     eventsQueue = asyncio.Queue()
@@ -39,11 +29,12 @@ async def main():
         for sym in symbols
     ]
 
-    # create trades tasks for each symbol
-    trades_tasks = [
-        asyncio.create_task(run_ws(exch, [sym], WsEventType.TRADE, eventsQueue))
-        for sym in symbols
-    ]
+    # # create trades tasks for each symbol
+    # trades_tasks = [
+    # asyncio.create_task(run_ws(exch, [sym], WsEventType.TRADE, eventsQueue))
+    # for sym in symbols
+    # ]
+    trades_tasks = []
 
     await asyncio.gather(*ob_tasks, *trades_tasks)
     await eventsQueue.join()
@@ -53,3 +44,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+    # asyncio.run(snapshot())
