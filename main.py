@@ -1,50 +1,31 @@
 import asyncio
-import signal
 
-from ws import run_ws
-
-from utils import raise_graceful_exit
-
-from exchanges import Binance, Kraken, WsEventType
-from events import WsEventType, handle_events
-
+import logging
 import tracemalloc
 
+from ws_apis.websocket import Websocket
+from ws_apis.binance import BinanceWebsocket, BinanceAPI
+
+
 tracemalloc.start()
+logging.basicConfig(level=logging.INFO)
 
 
 async def main():
-    # register signal handler
-    loop = asyncio.get_event_loop()
-    loop.add_signal_handler(signal.SIGINT, raise_graceful_exit)
 
-    # create symbols list
-    exch = Binance()
-    symbols = ["etheur"]
-    # symbols = ["btceur", "etheur", "adaeur", "dogeeur"]
+    subscription_msg = BinanceAPI.prepare_book_subscription_msg(["etheur"], 0)
 
-    # create eventsQueue and events_task
-    eventsQueue = asyncio.Queue()
-    events_task = asyncio.create_task(handle_events(eventsQueue, symbols))
+    async with BinanceWebsocket(BinanceAPI._ws_url, subscription_msg) as ws:
+        # async with Websocket(BinanceWebsocket._ws_url, subscription_msg) as ws:
+        for _ in range(10):
+            msg = await ws.recv()
+            print(msg)
 
-    # create orderbook tasks for each symbol
-    ob_tasks = [
-        asyncio.create_task(run_ws(exch, [sym], WsEventType.BOOK, eventsQueue))
-        for sym in symbols
-    ]
-
-    # # create trades tasks for each symbol
-    # trades_tasks = [
-    # asyncio.create_task(run_ws(exch, [sym], WsEventType.TRADE, eventsQueue))
-    # for sym in symbols
-    # ]
-    trades_tasks = []
-
-    await asyncio.gather(*ob_tasks, *trades_tasks)
-    await eventsQueue.join()
-    await events_task
-    print("closed gracefully")
+    print("got it dude")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("KeyboardInterrupt")
