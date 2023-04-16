@@ -10,7 +10,9 @@ async def queue_callback(
     eventsQueue: asyncio.Queue, callback: Callable, *args, **kwargs
 ):
     """executes a callback and puts the result in the eventsQueue"""
+    # await asyncio.sleep(1)
     result = await callback(*args, **kwargs)
+    # await asyncio.sleep(1)
     eventsQueue.put_nowait(result)
 
 
@@ -43,6 +45,7 @@ async def run_ws(
 ):
 
     async with websockets.connect(exchange._ws_url) as websocket:
+        # subscribe
         if wsEventType == WsEventType.BOOK:
             subscription_msg = exchange.prepare_book_subscription_msg(symbols)
         elif wsEventType == WsEventType.TRADE:

@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional, Any
 from datetime import datetime
-import sys
 
 
 class WsEventType(Enum):
@@ -56,16 +55,26 @@ class TradeEvent:
     trades: list[Trade]
 
 
-async def handle_events(eventsQueue: asyncio.Queue):
+async def handle_events(eventsQueue: asyncio.Queue, symbols: list[str]):
+    from orderbook import BinanceOrderbook
+
+    # raise_graceful_exit()
+
+    orderbooks = {symbol: BinanceOrderbook(symbol) for symbol in symbols}
+
     while True:
         event = await eventsQueue.get()
         eventsQueue.task_done()
-        print("\nevent: ", event)
+
+        if isinstance(event, OrderbookEvent):
+            orderbooks[event.symbol].update(event)
+            # ob.update(event)
 
         # exch_time = datetime.fromtimestamp(event.ts_exchange / 1e9)
         # created_time = datetime.fromtimestamp(event.ts_recorded / 1e9)
         # print(
-        # f"\nreceived {event.__class__.__name__} ({event.type}) event", event.symbol
+        # f"\nreceived {event.__class__.__name__} ({event.type}) event",
+        # event.symbol,
         # )
         # print(f"exchange time: {exch_time}")
         # print(f"  created time: {created_time}")
@@ -76,3 +85,7 @@ async def handle_events(eventsQueue: asyncio.Queue):
         # elif isinstance(event, TradeEvent):
         # print("_TRADE_", end="")
         # sys.stdout.flush()
+
+    # except GracefulExit:
+    # print("GracefulExit")
+    # return

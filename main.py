@@ -8,6 +8,10 @@ from utils import raise_graceful_exit
 from exchanges import Binance, Kraken, WsEventType
 from events import WsEventType, handle_events
 
+import tracemalloc
+
+tracemalloc.start()
+
 
 async def main():
     # register signal handler
@@ -15,13 +19,13 @@ async def main():
     loop.add_signal_handler(signal.SIGINT, raise_graceful_exit)
 
     # create symbols list
-    exch = Kraken()
-    symbols = ["btceur"]
+    exch = Binance()
+    symbols = ["etheur"]
     # symbols = ["btceur", "etheur", "adaeur", "dogeeur"]
 
     # create eventsQueue and events_task
     eventsQueue = asyncio.Queue()
-    events_task = asyncio.create_task(handle_events(eventsQueue))
+    events_task = asyncio.create_task(handle_events(eventsQueue, symbols))
 
     # create orderbook tasks for each symbol
     ob_tasks = [
@@ -44,4 +48,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-    # asyncio.run(snapshot())

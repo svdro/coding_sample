@@ -22,7 +22,7 @@ async def get_request(url: str, params: dict[str, Any]) -> dict[str, Any]:
 class Exchange(abc.ABC):
     """
     Exchange is an abstract class that provides a collection of static
-    methods for interacting with Crypto Exchange APIs.
+    methods for interacting with Crypto Exchange public APIs.
     """
 
     _name: str
@@ -137,7 +137,7 @@ class Binance(Exchange):
     async def get_snapshot(symbol: str) -> dict[str, Any]:
         """gets the order book snapshot from the rest api"""
         url = urljoin(Binance._rest_url, "api/v3/depth")
-        params = {"symbol": symbol, "limit": 100}
+        params = {"symbol": symbol, "limit": 10}
         return await get_request(url, params)
 
     @staticmethod
