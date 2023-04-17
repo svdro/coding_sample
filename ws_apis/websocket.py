@@ -67,6 +67,13 @@ class Websocket:
                 self._logger.info(f"exception: {e}")
                 return
 
+    async def run(self, queue_out: asyncio.Queue):
+        """Run the websocket in a loop and put the messages in the queue"""
+        await self.connect()
+        while True:
+            msg = await self.recv()
+            await queue_out.put(msg)
+
     async def recv(self):
         msg = await asyncio.wait_for(self._queue.get(), timeout=self._timeout)
         return msg

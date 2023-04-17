@@ -1,30 +1,16 @@
 import asyncio
-import aiohttp
 import json
 import logging
 import time
 
-from enum import Enum
 from typing import Any, Union
 from urllib.parse import urljoin
 
-from .utils import SymbolsMeta
-from .websocket import Websocket
-from .events import WsEventType, OrderbookEvent, OBEventType, Level
+from .events import WsEventType, StreamType
+from .events import OrderbookEvent, OBEventType, Level
 from .events import TradeEvent, Trade, TradeSide
-
-
-class StreamType(Enum):
-    TRADES = "trades"
-    BOOK = "orderbook"
-
-
-async def get_request(url: str, params: dict[str, Any]) -> dict[str, Any]:
-    """makes a get request to the given url and params. return JSON"""
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url, params=params) as resp:
-            resp.raise_for_status()
-            return await resp.json()
+from .utils import get_request, SymbolsMeta
+from .websocket import Websocket
 
 
 async def get_ob_snapshot_binance(symbol: str) -> dict[str, Any]:
@@ -51,22 +37,6 @@ def parse_level_binance(data: list[str]) -> Level:
     return Level(price, qty)
 
 
-def parse_trade_msg_binance(
-    exch_name: str, symbol: str, data: dict[str, Any]
-) -> TradeEvent:
-    """parses a binance websocket message and returns a TradeEvent"""
-    ts_exchange = int(data["T"] * 1e6)
-    side = TradeSide.SELL if data["m"] else TradeSide.BUY
-    trade = Trade(price=float(data["p"]), qty=float(data["q"]), side=side)
-    return TradeEvent(
-        exch_name=exch_name,
-        symbol=symbol,
-        ts_exchange=ts_exchange,
-        ts_recorded=int(time.time() * 1e9),
-        trades=[trade],
-    )
-
-
 def parse_book_msg_binance(
     exch_name: str, symbol: str, data: dict[str, Any]
 ) -> OrderbookEvent:
@@ -84,6 +54,22 @@ def parse_book_msg_binance(
         ts_exchange=ts_exchange,
         ts_recorded=int(time.time() * 1e9),
         other=update_ids,
+    )
+
+
+def parse_trade_msg_binance(
+    exch_name: str, symbol: str, data: dict[str, Any]
+) -> TradeEvent:
+    """parses a binance websocket message and returns a TradeEvent"""
+    ts_exchange = int(data["T"] * 1e6)
+    side = TradeSide.SELL if data["m"] else TradeSide.BUY
+    trade = Trade(price=float(data["p"]), qty=float(data["q"]), side=side)
+    return TradeEvent(
+        exch_name=exch_name,
+        symbol=symbol,
+        ts_exchange=ts_exchange,
+        ts_recorded=int(time.time() * 1e9),
+        trades=[trade],
     )
 
 
@@ -136,7 +122,7 @@ class BinanceWebsocket(Websocket):
         super().__init__(self._ws_url, subscription_msg)
 
         self.symbol = symbol
-        self.streamType: StreamType = streamType
+        self.streamType = streamType
 
         # binance orderbook streams require special treatment.
         if self.streamType == StreamType.BOOK:
@@ -145,15 +131,11 @@ class BinanceWebsocket(Websocket):
 
         self._logger = logging.getLogger(__name__)
 
-    async def __aenter__(self):
-        await super().__aenter__()
-        return self
-
     async def connect(self):
         """connects to the websocket and subscribes to the symbols"""
         await super().connect()
         if self.streamType == StreamType.BOOK:
-            task = asyncio.create_task(self._queue_snapshot_rest(self.symbol))
+            task = self._loop.create_task(self._queue_snapshot_rest(self.symbol))
             self._coros.append(task)
 
     async def _listen(self):
@@ -168,7 +150,6 @@ class BinanceWebsocket(Websocket):
             await self._queue.put(self._parse_trade_msg(data))
         else:
             self._logger.info(f"received other event {event_type}")
-            print(data)
 
     async def recv(self) -> Union[OrderbookEvent, TradeEvent]:
         """returns an OrderbookEvent or a TradeEvent"""
@@ -219,15 +200,14 @@ class BinanceWebsocket(Websocket):
         snapshot = await self._get_snapshot_rest(symbol)
         await self._queue.put(snapshot)
 
-    def _prepare_subscription_msg(self, streamType: StreamType, symbol) -> str:
+    def _prepare_subscription_msg(self, streamType: StreamType, symbol: str) -> str:
         """returns the subscription message for the given symbol and streamType"""
         ws_symbol = self._symbolsMeta.sym2ws_sym(self._name, symbol)
         if streamType == StreamType.TRADES:
             return prepare_trades_subscription_msg_binance([ws_symbol], 0)
-        elif streamType == StreamType.BOOK:
+        if streamType == StreamType.BOOK:
             return prepare_book_subscription_msg_binance([ws_symbol], 0)
-        else:
-            raise ValueError(f"streamType {streamType} not supported")
+        raise ValueError(f"streamType {streamType} not supported")
 
 
 class BinanceEventsBuffer:
@@ -290,13 +270,3 @@ class BinanceEventsBuffer:
         lid = event.other["last_update_id"]
         fid = event.other["first_update_id"]
         return fid, lid
-
-
-class BinanceWsAPI:
-    """Binance WS-API can manage multiple ws connections"""
-
-    _ws_url = "wss://stream.binance.com:9443/ws"
-    _rest_url = "https://api.binance.com/"
-
-    def __init__(self):
-        pass

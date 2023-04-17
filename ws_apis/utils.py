@@ -1,6 +1,15 @@
+import aiohttp
 import json
 from typing import Any, Optional
 from dataclasses import dataclass
+
+
+async def get_request(url: str, params: dict[str, Any]) -> dict[str, Any]:
+    """makes a get request to the given url and params. return JSON"""
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, params=params) as resp:
+            resp.raise_for_status()
+            return await resp.json()
 
 
 def read_json(path: str) -> Any:

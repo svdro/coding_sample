@@ -5,8 +5,21 @@ from typing import Optional, Any
 from datetime import datetime
 
 
+# TODO: move StreamType to __init__.py
+class StreamType(Enum):
+    TRADES = "trades"
+    BOOK = "book"
+
+
+# TODO: move WsEventType and OBEventType to events.py
+class ExchangeType(Enum):
+    BINANCE = "binance"
+    KRAKEN = "kraken"
+
+
 class WsEventType(Enum):
     OTHER = "other"
+    HEARTBEAT = "heartbeat"
     BOOK = "book"
     TRADE = "trade"
 
