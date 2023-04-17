@@ -2,8 +2,7 @@ import websockets
 import asyncio
 import logging
 
-from typing import Optional, Type
-from types import TracebackType
+from typing import Optional
 
 
 class Websocket:
@@ -16,7 +15,7 @@ class Websocket:
         self._logger = logging.getLogger(__name__)
 
         self._loop = asyncio.get_event_loop()
-        self._listen_task = None
+        self._coros = []
 
         self._queue = asyncio.Queue()
         self._conn: Optional[websockets.WebSocketClientProtocol] = None
@@ -25,7 +24,7 @@ class Websocket:
         await self.connect()
         return self
 
-    async def __aexit__(self, *args):
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.cleanup()
 
     async def connect(self):
@@ -33,14 +32,16 @@ class Websocket:
         await self._conn.send(self._subscription_msg)
 
         task = self._loop.create_task(self._listen_loop())
-        self._listen_task = task
+        self._coros.append(task)
 
     async def cleanup(self):
         if self._conn is not None:
             await self._conn.close()
 
-        if self._listen_task is not None:
-            await self._listen_task
+        for task in self._coros:
+            task.cancel()
+
+        await asyncio.wait(self._coros, timeout=10)
 
     async def _listen(self):
         assert self._conn is not None
@@ -63,9 +64,9 @@ class Websocket:
                 self._logger.info(f"connection closed ok{e}")
                 break
             except Exception as e:
-                print("exception: ", e)
                 self._logger.info(f"exception: {e}")
                 return
 
     async def recv(self):
-        return await asyncio.wait_for(self._queue.get(), timeout=self._timeout)
+        msg = await asyncio.wait_for(self._queue.get(), timeout=self._timeout)
+        return msg

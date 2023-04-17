@@ -6,9 +6,9 @@ from datetime import datetime
 
 
 class WsEventType(Enum):
-    OTHER = 1
-    BOOK = 2
-    TRADE = 3
+    OTHER = "other"
+    BOOK = "book"
+    TRADE = "trade"
 
 
 class OBEventType(Enum):
@@ -17,8 +17,8 @@ class OBEventType(Enum):
 
 
 class TradeSide(Enum):
-    BUY = 1
-    SELL = 2
+    BUY = "buy"
+    SELL = "sell"
 
 
 @dataclass
