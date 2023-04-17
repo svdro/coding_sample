@@ -1,7 +1,11 @@
 import aiohttp
+import os
 import json
-from typing import Any, Optional
+
 from dataclasses import dataclass
+from typing import Any
+
+_base_dir = os.path.dirname(__file__)
 
 
 async def get_request(url: str, params: dict[str, Any]) -> dict[str, Any]:
@@ -33,7 +37,7 @@ class SymbolsMeta:
     """
 
     _instance = None
-    _symbols_path = "symbols.json"
+    _symbols_path = os.path.join(_base_dir, "symbols.json")
     _exchanges = ("binance", "kraken")
 
     def __new__(cls):
