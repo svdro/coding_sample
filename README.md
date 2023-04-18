@@ -1,29 +1,50 @@
-# Coding Sample
+## Coding Sample
 
-### Outline
- 1. Create Dataset from crypto exchange apis
-   * collect orderbook snapshots/executed trades
- 2. Create a small model to predict short term volatitliy
-   * maybe transformer or decision tree
- 3. Run model in a live setting, do some nice visualizations
+This is a basic python wrapper that provides a uniform interface for interacting with public crypto exchange websocket streams using the asyncio framework.
 
-### Dataset
- * [x] Connect to websocket apis
- * [x] Subscribe to orderbook and trades feeds
- * [ ] Maintain orderbooks
- * [ ] Maintain trades (for snapshots)
- * [ ] Write orderbook and trades to repo (in this case probably csv)
-   * collect data for kraken and coinbase
-   * 1 second granularity
-   * cap orderbook depth at 100
- * [ ] Collect data for coinmarketcap top10 non-stablecoins
+## Features
 
-### Model
- * [ ] Train a simple transformer model in colab on orderbook snapshots and trades.
- * [ ] Predict realized volatility
- * [ ] Evaluate on room mean square percentage error
- * [ ] Maybe create exchange and symbol embeddings
+ * Supports the [Kraken](https://docs.kraken.com/websockets) and [Binance](/https://binance-docs.github.io/apidocs/) websocket apis
+ * Implementation of Orderbook and Trades Streams
+ * Common Interface for interacting with ws-streams 
+   * maps symbol names (which differ between exchanges) to a standardized format (e.g: `btcusdt`)
+   * abstracts subscribing/unsubscribing and handling ws-events
+ * Websocket messages are parsed and returned as standardized "`python dataclasses`"
+ * Handles maintaining and closing multiple ws-connections
 
-### Live Setting
- * [ ] 
- 
+## Example
+
+```python
+import asyncio
+from ws_apis import BinanceWebsocket, KrakenWebsocket, StreamType
+
+async def main():
+  ws = KrakenWebsocket(StreamType.TRADE, "ethusdt")
+  await ws.connect()
+  try:
+    for _ in range(10):
+      event = ws.recv()
+      print(event)
+  finally:
+    ws.cleanup()
+
+if __name__ == "__main__":
+  asyncio.run(main())
+```
+
+
+## Example using async context managers
+
+```python
+import asyncio
+from ws_apis import BinanceWebsocket, KrakenWebsocket, StreamType
+
+async def main():
+  with BinanceWebsocket(StreamType.BOOK, "ethusdt") as ws:
+    for _ in range(10):
+      event = await ws.recv()
+      print(event)
+
+if __name__ == "__main__":
+  asyncio.run(main())
+```
