@@ -19,7 +19,7 @@ import asyncio
 from ws_apis import BinanceWebsocket,  StreamType
 
 async def main():
-  ws = KrakenWebsocket(StreamType.TRADE, "ethusdt")
+  ws = KrakenWebsocket(StreamType.TRADES, "ethusdt")
   await ws.connect()
   try:
     for _ in range(10):
