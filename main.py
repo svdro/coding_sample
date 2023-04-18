@@ -1,78 +1,49 @@
 import asyncio
-
-import logging
-import tracemalloc
-
+import sys
 from datetime import datetime
 
-from ws_apis.ws_api import WsApi
-from ws_apis.binance import BinanceWebsocket
-from ws_apis.kraken import KrakenWebsocket
-from ws_apis.events import OrderbookEvent, StreamType
+
+from ws_apis import BinanceWebsocket, KrakenWebsocket, OrderbookEvent, StreamType
+from orderbook import Orderbook
 
 
-tracemalloc.start()
-logging.basicConfig(level=logging.INFO)
+# logging.basicConfig(level=logging.INFO)
+_green, _red, _default = "\033[92m", "\033[91m", "\033[0m"
 
 
-async def main_context_manager():
+async def stream_orderbook(exch_name: str, symbol: str):
+    orderbook = Orderbook(exch_name, symbol)
+    Websocket = BinanceWebsocket if exch_name == "binance" else KrakenWebsocket
 
-    async with BinanceWebsocket(StreamType.BOOK, "ethusdt") as ws:
+    async with Websocket(StreamType.BOOK, "ethusdt") as ws:
         while True:
             event = await ws.recv()
+            assert isinstance(event, OrderbookEvent)
+            orderbook.update(event)
+            snap = orderbook.take_snapshot()
 
-            from datetime import datetime
+            ts_exch = datetime.fromtimestamp(snap.ts_exchange / 1e9)
 
-            ts_exch = datetime.fromtimestamp(event.ts_exchange / 1e9)
-            ts_rec = datetime.fromtimestamp(event.ts_recorded / 1e9)
-            msg = f"exch: {event.exch_name}, symbol: {event.symbol}"
-            msg += f", ts_exch: {ts_exch}"
-            msg += f", ts_rec: {ts_rec}"
-            if isinstance(event, OrderbookEvent):
-                msg += f", type: {event.type}"
-            print(msg)
+            info_str = f"{ts_exch} - {snap.exch_name} ({snap.symbol}):"
+            bids_str = ", ".join(f"({b.price:.4f} {b.qty:.3f})" for b in snap.bids[:3])
+            asks_str = ", ".join(f"({a.price:.4f} {a.qty:.3f})" for a in snap.asks[:3])
+
+            bids_str = f"{_green}{bids_str}{_default}"
+            asks_str = f"{_red}{asks_str}{_default}"
+            print(f"{info_str}\tbids: {bids_str} | asks: {asks_str}")
 
 
-async def main_finally():
-    # subscription_msg = prepare_book_subscription_msg_binance(["etheur"], 0)
-    streamType = StreamType.TRADES
-    # streamType = StreamType.BOOK
-    print("got streamType")
-    # binance = BinanceWebsocket(streamType, "ethusdt")
-    binance = KrakenWebsocket(streamType, "etheur")
-    await binance.connect()
-
+async def main(exch_name: str, symbol: str):
     try:
-        for _ in range(20):
-            event = await binance.recv()
-            print(event)
+        await stream_orderbook(exch_name, symbol)
+    except KeyboardInterrupt:
+        print("KeyboardInterrupt")
     finally:
-        await binance.cleanup()
-
-
-async def main():
-    symbols = ["etheur", "ethusdt", "dogeusdt", "btcusdt", "btcusdc"]
-    # wsApi = WsApi("book", "binance", symbols)
-    wsApi = WsApi("book", "kraken", symbols)
-    print(wsApi.streamType)
-
-    await wsApi.start()
-    # asyncio.create_task(wsApi.start())
-    while True:
-        # for _ in range(40):
-        event = await wsApi.recv()
-        ts_exch = datetime.fromtimestamp(event.ts_exchange / 1e9)
-        ts_rec = datetime.fromtimestamp(event.ts_recorded / 1e9)
-        msg = f"exch: {event.exch_name:<10s}, symbol: {event.symbol:<10s}"
-        msg += f", ts_exch: {ts_exch}"
-        msg += f", ts_rec: {ts_rec}"
-        print(msg)
+        pass
 
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-        # asyncio.run(main_finally())
-        # asyncio.run(main_context_manager())
-    except KeyboardInterrupt:
-        print("KeyboardInterrupt")
+    # parse command line arguments
+    exch_name = sys.argv[1] if len(sys.argv) > 1 else "binance"
+    symbol = sys.argv[2] if len(sys.argv) > 2 else "ethusdt"
+    asyncio.run(main(exch_name, symbol))
