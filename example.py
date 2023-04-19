@@ -33,7 +33,7 @@ async def stream_orderbook(exch_name: str, symbol: str):
     orderbook = Orderbook(exch_name, symbol)
     Websocket = BinanceWebsocket if exch_name == "binance" else KrakenWebsocket
 
-    async with Websocket(StreamType.BOOK, symbol) as ws:
+    async with Websocket(StreamType.BOOK, symbol, 100) as ws:
         while True:
             event = await ws.recv()
 

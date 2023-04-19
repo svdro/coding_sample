@@ -24,7 +24,7 @@ async def main():
   await ws.connect()
   try:
     for _ in range(10):
-      event = ws.recv()
+      event = await ws.recv()
       print(event)
   finally:
     ws.cleanup()
@@ -41,7 +41,7 @@ import asyncio
 from ws_apis import BinanceWebsocket, StreamType
 
 async def main():
-  async with BinanceWebsocket(StreamType.BOOK, "ethusdt") as ws:
+  async with BinanceWebsocket(StreamType.BOOK, "ethusdt", depth=100) as ws:
     for _ in range(10):
       event = await ws.recv()
       print(event)
@@ -55,9 +55,9 @@ from ws_apis import WsManager, Subscription, OrderbookEvent
 
 async def main():
   subs = [
-    Subscription("kraken", "adaeur", "book"),
-    Subscription("kraken", "adaeur", "trades"),
-    Subscription("binance", "adausdt", "book"),
+    Subscription("kraken", "adaeur", "book", 500),
+    Subscription("binance", "adausdt", "book", 500),
+    Subscription("kraken", "adausdt", "trades"),
     Subscription("binance", "adausdt", "trades"),
     ]
   

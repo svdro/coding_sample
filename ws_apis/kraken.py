@@ -3,7 +3,7 @@ import json
 import logging
 import time
 
-from typing import Any, Union
+from typing import Any, Optional, Union
 
 from .events import WsEventType, StreamType
 from .events import OrderbookEvent, OBEventType, Level
@@ -79,11 +79,11 @@ def parse_trade_msg_kraken(exch_name: str, symbol: str, data: list) -> TradeEven
     )
 
 
-def prepare_book_subscription_msg_kraken(symbols: list[str]) -> str:
+def prepare_book_subscription_msg_kraken(symbols: list[str], depth: int = 100) -> str:
     msg = {
         "event": "subscribe",
         "pair": [symbol for symbol in symbols],
-        "subscription": {"name": "book"},
+        "subscription": {"name": "book", "depth": depth},
     }
     return json.dumps(msg)
 
@@ -102,8 +102,8 @@ class KrakenWebsocket(Websocket):
     _symbolsMeta: SymbolsMeta = SymbolsMeta()
     _ws_url: str = "wss://ws.kraken.com"
 
-    def __init__(self, streamType: StreamType, symbol: str):
-        subscription_msg = self._prepare_subscription_msg(streamType, symbol)
+    def __init__(self, streamType: StreamType, symbol: str, depth: Optional[int]):
+        subscription_msg = self._prepare_subscription_msg(streamType, symbol, depth)
         print(subscription_msg)
         super().__init__(self._ws_url, subscription_msg)
 
@@ -133,6 +133,7 @@ class KrakenWebsocket(Websocket):
             self._logger.info(f"received other event {event_type}")
 
     async def recv(self) -> Union[OrderbookEvent, TradeEvent]:
+        """receives a message from the websocket and returns it"""
         while True:
             try:
                 return await asyncio.wait_for(self._queue.get(), timeout=self._timeout)
@@ -147,12 +148,15 @@ class KrakenWebsocket(Websocket):
         symbol = self._symbolsMeta.ws_sym2sym(self._name, data[-1])
         return parse_trade_msg_kraken(self._name, symbol, data)
 
-    def _prepare_subscription_msg(self, streamType: StreamType, symbol: str) -> str:
+    def _prepare_subscription_msg(
+        self, streamType: StreamType, symbol: str, depth: Optional[int] = None
+    ) -> str:
         """returns the subscription message for the given symbol and streamType"""
         ws_symbol = self._symbolsMeta.sym2ws_sym(self._name, symbol)
 
         if streamType == StreamType.BOOK:
-            return prepare_book_subscription_msg_kraken([ws_symbol])
+            assert depth is not None
+            return prepare_book_subscription_msg_kraken([ws_symbol], depth)
         if streamType == StreamType.TRADES:
             return prepare_trades_subscription_msg_kraken([ws_symbol])
         raise ValueError(f"invalid streamType: {streamType}")

@@ -1,7 +1,7 @@
 import asyncio
 import logging
 
-from typing import Union, NamedTuple
+from typing import NamedTuple, Optional, Union
 from .binance import BinanceWebsocket
 from .kraken import KrakenWebsocket
 from .events import StreamType, ExchangeType, OrderbookEvent, TradeEvent
@@ -11,6 +11,7 @@ class Subscription(NamedTuple):
     exch_name: str
     symbol: str
     stream_name: str
+    orderbook_depth: Optional[int] = None
 
 
 class WsManager:
@@ -36,14 +37,14 @@ class WsManager:
         await self.cleanup()
 
     def __create_ws_connection(self, subscription: Subscription):
-        exchType = ExchangeType(subscription.exch_name)
         streamType = StreamType(subscription.stream_name)
+        exchType = ExchangeType(subscription.exch_name)
         symbol = subscription.symbol
 
         if exchType == ExchangeType.BINANCE:
-            ws = BinanceWebsocket(streamType, symbol)
+            ws = BinanceWebsocket(streamType, symbol, subscription.orderbook_depth)
         elif exchType == ExchangeType.KRAKEN:
-            ws = KrakenWebsocket(streamType, symbol)
+            ws = KrakenWebsocket(streamType, symbol, subscription.orderbook_depth)
         else:
             raise ValueError(f"Exchange {exchType} not supported")
 

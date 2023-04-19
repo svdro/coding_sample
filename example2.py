@@ -50,8 +50,8 @@ async def print_orderbooks(orderbooks: dict[str, dict[str, Orderbook]]) -> None:
 
 async def main():
     subs = [
-        Subscription("kraken", "btcusdt", "book"),
-        Subscription("binance", "btcusdt", "book"),
+        Subscription("kraken", "btcusdt", "book", 100),
+        Subscription("binance", "btcusdt", "book", 100),
     ]
 
     # create orderbooks
@@ -60,7 +60,7 @@ async def main():
         ob = Orderbook(sub.exch_name, sub.symbol)
         orderbooks[sub.exch_name][sub.symbol] = ob
 
-    # start tasksj
+    # start tasks
     tasks = (
         asyncio.create_task(maintain_orderbooks(subs, orderbooks)),
         asyncio.create_task(print_orderbooks(orderbooks)),

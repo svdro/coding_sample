@@ -3,7 +3,7 @@ import json
 import logging
 import time
 
-from typing import Any, Union
+from typing import Any, Optional, Union
 from urllib.parse import urljoin
 
 from .events import WsEventType, StreamType
@@ -13,11 +13,11 @@ from .utils import get_request, SymbolsMeta
 from .websocket import Websocket
 
 
-async def get_ob_snapshot_binance(symbol: str) -> dict[str, Any]:
+async def get_ob_snapshot_binance(symbol: str, depth: int = 100) -> dict[str, Any]:
     """gets the order book snapshot from the rest api"""
     rest_url = "https://api.binance.com/"
     url = urljoin(rest_url, "api/v3/depth")
-    params = {"symbol": symbol, "limit": 10}
+    params = {"symbol": symbol, "limit": depth}
     return await get_request(url, params)
 
 
@@ -117,11 +117,12 @@ class BinanceWebsocket(Websocket):
     _rest_url = "https://api.binance.com/"
     _ws_url = "wss://stream.binance.com:9443/ws"
 
-    def __init__(self, streamType: StreamType, symbol: str):
+    def __init__(self, streamType: StreamType, symbol: str, depth: Optional[int]):
         subscription_msg = self._prepare_subscription_msg(streamType, symbol)
         super().__init__(self._ws_url, subscription_msg)
 
         self.symbol = symbol
+        self.depth = depth
         self.streamType = streamType
 
         # binance orderbook streams require special treatment.
@@ -190,7 +191,7 @@ class BinanceWebsocket(Websocket):
         """gets the order book snapshot from the rest api and returns an OrderbookEvent"""
         t = time.time()
         rest_symbol = self._symbolsMeta.sym2rest_sym(self._name, symbol)
-        data = await get_ob_snapshot_binance(rest_symbol)
+        data = await get_ob_snapshot_binance(rest_symbol, self.depth)
         ts_exchange = int((time.time() + t) / 2 * 1e9)  # fake ts_exchange
         return parse_snapshot_binance(self._name, symbol, ts_exchange, data)
 
