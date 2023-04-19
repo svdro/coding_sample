@@ -1,4 +1,8 @@
+import asyncio
+import logging
+
 from copy import deepcopy
+from datetime import datetime
 from ws_apis.events import OrderbookEvent, OBEventType, Level
 from typing import Any, Callable
 
@@ -52,6 +56,9 @@ class Orderbook:
         self.ts_exchange = 0
         self.ts_recorded = 0
 
+        self._lock = asyncio.Lock()
+        self._logger = logging.getLogger(__name__)
+
     def _update_bids(self, l: Level):
         idx = find_idx(self.bids, lambda b: b.price <= l.price)
         update_side(self.bids, l, idx)
@@ -61,10 +68,9 @@ class Orderbook:
         update_side(self.asks, l, idx)
 
     def _handle_snapshot(self, event: OrderbookEvent):
-        print("snapshot")
+        self._logger.info(f"Received snapshot for {self.symbol}")
         self.bids = event.bids
         self.asks = event.asks
-        self.is_waiting_for_snapshot = False
 
     def _handle_update(self, event: OrderbookEvent):
         for b in event.bids:
@@ -75,6 +81,7 @@ class Orderbook:
         self.asks = self.asks[: self.depth]
 
     def update(self, event: OrderbookEvent):
+        """processes an update event and updates the orderbook state"""
         self.ts_exchange = event.ts_exchange
         self.ts_recorded = event.ts_recorded
 
@@ -94,3 +101,13 @@ class Orderbook:
             self.ts_exchange,
             self.ts_recorded,
         )
+
+    async def async_update(self, event: OrderbookEvent):
+        """thread-safe update of the orderbook"""
+        async with self._lock:
+            self.update(event)
+
+    async def async_take_snapshot(self) -> OrderbookEvent:
+        """thread-safe snapshot of the orderbook"""
+        async with self._lock:
+            return self.take_snapshot()
