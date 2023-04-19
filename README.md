@@ -9,6 +9,7 @@ This is a basic python wrapper that provides a uniform interface for interacting
  * Common Interface for interacting with ws-streams 
    * maps symbol names (which differ between exchanges) to a standardized format (e.g: btcusdt)
    * abstracts subscribing/unsubscribing and handling ws-events
+   * synchronizes binance orderbook (Diff. Depth) stream with rest api orderbook (depth) snapshots
  * Websocket messages are parsed and returned as standardized "python dataclasses" events
  * Handles maintaining and closing multiple ws-connections
 
@@ -40,11 +41,29 @@ import asyncio
 from ws_apis import BinanceWebsocket, StreamType
 
 async def main():
-  with BinanceWebsocket(StreamType.BOOK, "ethusdt") as ws:
+  async with BinanceWebsocket(StreamType.BOOK, "ethusdt") as ws:
     for _ in range(10):
       event = await ws.recv()
       print(event)
+```
 
-if __name__ == "__main__":
-  asyncio.run(main())
+## Example subscribing to multiple websocket streams
+
+```python
+import asyncio
+from ws_apis import WsManager, Subscription, OrderbookEvent
+
+async def main():
+  subs = [
+    Subscription("kraken", "adaeur", "book"),
+    Subscription("kraken", "adaeur", "trades"),
+    Subscription("binance", "adausdt", "book"),
+    Subscription("binance", "adausdt", "trades"),
+    ]
+  
+  async with WsManager(subs) as wsm:
+    for _ in range(50):
+      event = await wsm.recv()
+      stream_name = "book" if isinstance(event, OrderbookEvent) else "trades"
+      print(f"{event.ts_exchange} {stream_name:5s} {event.exch_name:7s} {event.symbol:8s}")
 ```

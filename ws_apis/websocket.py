@@ -4,6 +4,9 @@ import logging
 
 from typing import Optional
 
+# disable websockets logging
+logging.getLogger("websockets").setLevel(logging.CRITICAL)
+
 
 class Websocket:
     _timeout = 10
@@ -65,9 +68,9 @@ class Websocket:
                 break
             except Exception as e:
                 self._logger.info(f"exception: {e}")
-                return
+                break
 
-    async def run(self, queue_out: asyncio.Queue):
+    async def _run(self, queue_out: asyncio.Queue):
         """Run the websocket in a loop and put the messages in the queue"""
         await self.connect()
         while True:
