@@ -45,13 +45,13 @@ async def stream_orderbook(exch_name: str, symbol: str):
 
 
 async def main(exch_name: str, symbol: str):
-    try:
-        await stream_orderbook(exch_name, symbol)
-    except KeyboardInterrupt:
-        pass
+    await stream_orderbook(exch_name, symbol)
 
 
 if __name__ == "__main__":
     exch_name = sys.argv[1] if len(sys.argv) > 1 else "binance"
     symbol = sys.argv[2] if len(sys.argv) > 2 else "btcusdt"
-    asyncio.run(main(exch_name, symbol))
+    try:
+        asyncio.run(main(exch_name, symbol))
+    except KeyboardInterrupt:
+        pass
