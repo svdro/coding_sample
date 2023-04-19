@@ -4,7 +4,7 @@ This is a basic python wrapper that provides a uniform interface for interacting
 
 ## Features
 
- * Supports the [Kraken](https://docs.kraken.com/websockets) and [Binance](/https://binance-docs.github.io/apidocs/) websocket apis
+ * Supports the [Kraken](https://docs.kraken.com/websockets) and [Binance](https://binance-docs.github.io/apidocs/) websocket apis
  * Implementation of Orderbook and Trades Streams
  * Common Interface for interacting with ws-streams 
    * maps symbol names (which differ between exchanges) to a standardized format (e.g: btcusdt)
