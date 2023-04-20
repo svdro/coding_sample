@@ -6,10 +6,6 @@ from ws_apis import BinanceWebsocket, KrakenWebsocket, OrderbookEvent
 from ws_apis import Level, StreamType
 from orderbook import Orderbook
 
-import logging
-
-logging.basicConfig(level=logging.INFO, stream=sys.stdout)
-
 
 def calculate_spot_price(b: list[Level], a: list[Level]) -> float:
     if not a or not b:
@@ -29,11 +25,11 @@ def format_orderbook_snapshot(snap: OrderbookEvent, depth: int = 3) -> str:
     return f"{info_str}\t{_g}{b_str}{_dflt} | {s_str} | {_r}{a_str}{_dflt}"
 
 
-async def stream_orderbook(exch_name: str, symbol: str):
-    orderbook = Orderbook(exch_name, symbol)
+async def stream_orderbook(exch_name: str, symbol: str, depth: int = 100):
+    orderbook = Orderbook(exch_name, symbol, depth)
     Websocket = BinanceWebsocket if exch_name == "binance" else KrakenWebsocket
 
-    async with Websocket(StreamType.BOOK, symbol, 100) as ws:
+    async with Websocket(StreamType.BOOK, symbol, depth) as ws:
         while True:
             event = await ws.recv()
 

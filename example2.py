@@ -49,6 +49,7 @@ async def print_orderbooks(orderbooks: dict[str, dict[str, Orderbook]]) -> None:
 
 
 async def main():
+    # create subscriptions
     subs = [
         Subscription("kraken", "btcusdt", "book", 100),
         Subscription("binance", "btcusdt", "book", 100),
@@ -57,7 +58,8 @@ async def main():
     # create orderbooks
     orderbooks = defaultdict(dict)
     for sub in [s for s in subs if s.stream_name == "book"]:
-        ob = Orderbook(sub.exch_name, sub.symbol)
+        assert sub.orderbook_depth is not None
+        ob = Orderbook(sub.exch_name, sub.symbol, sub.orderbook_depth)
         orderbooks[sub.exch_name][sub.symbol] = ob
 
     # start tasks

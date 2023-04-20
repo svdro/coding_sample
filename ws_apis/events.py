@@ -1,8 +1,6 @@
-import asyncio
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional, Any
-from datetime import datetime
 
 
 # TODO: move StreamType to __init__.py
@@ -11,7 +9,7 @@ class StreamType(Enum):
     BOOK = "book"
 
 
-# TODO: move WsEventType and OBEventType to events.py
+# TODO: move ExchangeType to __init__.py
 class ExchangeType(Enum):
     BINANCE = "binance"
     KRAKEN = "kraken"

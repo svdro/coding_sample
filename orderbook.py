@@ -2,15 +2,104 @@ import asyncio
 import logging
 
 from copy import deepcopy
-from datetime import datetime
 from ws_apis.events import OrderbookEvent, OBEventType, Level
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 
-def find_idx(x: list[Any], comparison: Callable):
-    """utility function to find index of element in list"""
+def _update_side(side: dict[float, float], level: Level):
+    if level.price in side and level.qty <= 0:
+        del side[level.price]
+    elif level.qty > 0:
+        side[level.price] = level.qty
+
+
+def _trim_side(side: dict[float, float], depth: int, reverse: bool = False):
+    keys = sorted(side.keys(), reverse=reverse)[depth:]
+    for k in keys:
+        del side[k]
+
+
+class Orderbook:
+    """
+    Orderbook maintains a local copy of the orderbook for a given symbol.
+    It updates the orderbook state when it receives an update from the exchange.
+    """
+
+    def __init__(self, exch_name: str, symbol: str, depth: int):
+        self.exch_name = exch_name
+        self.symbol = symbol
+        self.depth = depth
+
+        self.asks: dict[float, float] = {}
+        self.bids: dict[float, float] = {}
+        self.ts_exchange: int = 0
+        self.ts_recorded: int = 0
+
+        self._lock = asyncio.Lock()
+        self._logger = logging.getLogger(__name__)
+
+    def _handle_snapshot(self, event: OrderbookEvent):
+        self._logger.info(f"taking snapshot of {self.symbol}")
+
+        self.asks = {l.price: l.qty for l in event.asks}
+        self.bids = {l.price: l.qty for l in event.bids}
+
+    def _handle_update(self, event: OrderbookEvent):
+        for l in event.asks:
+            _update_side(self.asks, l)
+
+        for l in event.bids:
+            _update_side(self.bids, l)
+
+        if len(self.asks) > self.depth:
+            _trim_side(self.asks, self.depth)
+
+        if len(self.bids) > self.depth:
+            _trim_side(self.bids, self.depth, reverse=True)
+
+    def update(self, event: OrderbookEvent):
+        self.ts_exchange = event.ts_exchange
+        self.ts_recorded = event.ts_recorded
+
+        if event.type == OBEventType.SNAPSHOT:
+            self._handle_snapshot(event)
+        else:
+            self._handle_update(event)
+
+    def take_snapshot(self, depth: Optional[int] = None) -> OrderbookEvent:
+        depth = depth or self.depth
+        return OrderbookEvent(
+            self.exch_name,
+            self.symbol,
+            OBEventType.SNAPSHOT,
+            [Level(p, q) for p, q in sorted(self.bids.items(), reverse=True)[:depth]],
+            [Level(p, q) for p, q in sorted(self.asks.items())[:depth]],
+            self.ts_exchange,
+            self.ts_recorded,
+        )
+
+    async def async_update(self, event: OrderbookEvent):
+        """thread-safe update of the orderbook"""
+        async with self._lock:
+            self.update(event)
+
+    async def async_take_snapshot(self, depth: Optional[int] = None) -> OrderbookEvent:
+        """thread-safe snapshot of the orderbook"""
+        async with self._lock:
+            return self.take_snapshot(depth)
+
+
+""" ==================== Orderbook Alt ==================== """
+
+
+def find_idx(x: list[Any], key: Callable):
+    """
+    find the idx of the first occurence of an element that matches the key.
+    in practice this is faster than binary search when implemented in python
+    because most of the time orderbook updates occur near the start of the list.
+    """
     for i, b in enumerate(x):
-        if comparison(b):
+        if key(b):
             return i
     return len(x)
 
@@ -41,16 +130,17 @@ def update_side(side: list[Level], l: Level, idx: int):
         side.insert(idx, l)
 
 
-class Orderbook:
+class OrderbookAlt:
     """
-    Orderbook maintains a local copy of the orderbook for a given symbol.
-    It updates the orderbook state when it receives an update from the exchange.
+    List-based version of Orderbook (almost 100 x slower at depth = 5000)
     """
 
     def __init__(self, exch_name: str, symbol: str, depth: int = 10):
         self.exch_name = exch_name
         self.symbol = symbol
         self.depth = depth
+        self._depth = depth
+
         self.bids: list[Level] = []
         self.asks: list[Level] = []
         self.ts_exchange = 0
@@ -90,14 +180,15 @@ class Orderbook:
         elif event.type == OBEventType.UPDATE:
             self._handle_update(event)
 
-    def take_snapshot(self) -> OrderbookEvent:
-        """taskes a snapshot of the current state of the orderbook"""
+    def take_snapshot(self, depth: Optional[int] = None) -> OrderbookEvent:
+        """takes a snapshot of the current state of the orderbook"""
+        depth = depth or self.depth
         return OrderbookEvent(
             self.exch_name,
             self.symbol,
             OBEventType.SNAPSHOT,
-            deepcopy(self.bids),
-            deepcopy(self.asks),
+            deepcopy(self.bids[:depth]),
+            deepcopy(self.asks[:depth]),
             self.ts_exchange,
             self.ts_recorded,
         )
@@ -107,7 +198,7 @@ class Orderbook:
         async with self._lock:
             self.update(event)
 
-    async def async_take_snapshot(self) -> OrderbookEvent:
+    async def async_take_snapshot(self, depth: Optional[int] = None) -> OrderbookEvent:
         """thread-safe snapshot of the orderbook"""
         async with self._lock:
-            return self.take_snapshot()
+            return self.take_snapshot(depth)
