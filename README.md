@@ -17,7 +17,7 @@ This is a basic python wrapper that provides a uniform interface for interacting
 
 ```python
 import asyncio
-from ws_apis import BinanceWebsocket,  StreamType
+from ws_apis import KrakenWebsocket,  StreamType
 
 async def main():
   ws = KrakenWebsocket(StreamType.TRADES, "ethusdt")
@@ -27,7 +27,7 @@ async def main():
       event = await ws.recv()
       print(event)
   finally:
-    ws.cleanup()
+    await ws.cleanup()
 
 if __name__ == "__main__":
   asyncio.run(main())
